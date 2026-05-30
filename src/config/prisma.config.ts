@@ -7,4 +7,10 @@ export const prisma =
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
+async function connectDB(): Promise<void> {
+    await prisma.$connect();
+    console.log('✅ Database connected');
+}
+
+export { connectDB };
 export default prisma;

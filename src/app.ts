@@ -9,6 +9,7 @@ const app: Application = express();
 
 
 app.use(corsConfig);
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/health', (_req, res) => {

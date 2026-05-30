@@ -22,8 +22,9 @@
             "@repositories/*": ["repositories/*"],
 
             "@routes": ["routes"],
-            "@v1routes": ["routes/v1"],
-            "@v1routes/*": ["routes/v1/*"],
+            "@routes/*": ["routes/*"],
+            "@v1routes": ["routes/api/v1"],
+            "@v1routes/*": ["routes/api/v1/*"],
 
             "@services": ["services"],
             "@services/*": ["services/*"],

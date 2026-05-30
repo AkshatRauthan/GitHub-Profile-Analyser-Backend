@@ -23,8 +23,7 @@ router.post(
 
 router.get(
     '/google',
-    authController.
-    googleOAuthRedirect
+    authController.googleOAuthRedirect
 );
 
 router.get(

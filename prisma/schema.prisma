@@ -18,5 +18,76 @@ model user {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  githubProfiles         github_profile[]
+  githubAnalysisRequests github_analysis_request[]
+
   @@map("users")
+}
+
+model github_profile {
+  id               String   @id @default(uuid())
+  userId           String
+  githubUsername   String
+
+  name             String?
+  avatarUrl        String?
+  bio              String?  @db.Text
+  location         String?
+  company          String?
+  blog             String?
+  twitterUsername  String?
+
+  publicRepos      Int      @default(0)
+  followers        Int      @default(0)
+  following        Int      @default(0)
+  totalStars       Int      @default(0)
+  topLanguages     String?  // stored as JSON string: [{ language, count }]
+  accountCreatedAt DateTime?
+
+  lastAnalyzedAt   DateTime @default(now())
+  bestPersona      String?
+  bestPersonaScore Float?
+  lastRankedAt     DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysisRequests github_analysis_request[]
+  rankings         profile_ranking[]
+
+  @@unique([userId, githubUsername])
+  @@map("github_profiles")
+}
+
+model profile_ranking {
+  id           String   @id @default(uuid())
+  profileId    String
+  persona      String
+  overallScore Float
+  grade        String
+  breakdown    String   @db.Text
+  computedAt   DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile      github_profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, persona])
+  @@index([persona, overallScore])
+  @@map("profile_rankings")
+}
+
+model github_analysis_request {
+  id             String   @id @default(uuid())
+  userId         String
+  githubUsername String
+  profileId      String?
+  status         String   // "success" | "failed"
+  errorMessage   String?
+
+  createdAt      DateTime @default(now())
+
+  user           user            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile        github_profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@map("github_analysis_requests")
 }

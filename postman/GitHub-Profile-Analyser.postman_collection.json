@@ -1,0 +1,677 @@
+{
+  "info": {
+    "_postman_id": "gpa-collection-v1",
+    "name": "GitHub Profile Analyser API",
+    "description": "Complete API collection for GitHub Profile Analyser.\n\n## Setup\n1. Import the environment file\n2. Select **GitHub Profile Analyser - Local** environment\n3. Run **Auth → Register** or **Auth → Login** (tokens auto-saved)\n4. Run **Demo Flow → Full Screening Workflow** for end-to-end demo\n\n## Docs\nSee `/docs` folder in the repository for full feature documentation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level pre-request: warn if token missing on protected routes",
+          "const publicPaths = ['/auth/register', '/auth/login', '/auth/refresh', '/health'];",
+          "const url = pm.request.url.toString();",
+          "const isPublic = publicPaths.some(p => url.includes(p));",
+          "if (!isPublic && !pm.environment.get('accessToken')) {",
+          "    console.warn('⚠️  No accessToken in environment. Run Auth → Login or Register first.');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level test: log response time",
+          "pm.test('Response time under 30s', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(30000);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Server is healthy', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('healthy');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Authentication endpoints. Register/Login auto-save tokens to environment.",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\",\n  \"username\": \"{{userUsername}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Registration successful', () => pm.expect(json.success).to.be.true);",
+                  "    if (json.data?.tokens) {",
+                  "        pm.environment.set('accessToken', json.data.tokens.accessToken);",
+                  "        pm.environment.set('refreshToken', json.data.tokens.refreshToken);",
+                  "        pm.environment.set('userId', json.data.user.id);",
+                  "        console.log('✅ Tokens saved to environment');",
+                  "    }",
+                  "} else if (pm.response.code === 409) {",
+                  "    console.log('ℹ️  User already exists — run Login instead');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login successful', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Success flag true', () => pm.expect(json.success).to.be.true);",
+                  "if (json.data?.tokens) {",
+                  "    pm.environment.set('accessToken', json.data.tokens.accessToken);",
+                  "    pm.environment.set('refreshToken', json.data.tokens.refreshToken);",
+                  "    pm.environment.set('userId', json.data.user.id);",
+                  "    console.log('✅ Tokens saved to environment');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    const tokens = json.data?.tokens || json.data;",
+                  "    if (tokens?.accessToken) {",
+                  "        pm.environment.set('accessToken', tokens.accessToken);",
+                  "        pm.environment.set('refreshToken', tokens.refreshToken);",
+                  "        console.log('✅ Tokens refreshed and saved');",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Auth Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/profile"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns user data', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.data).to.have.property('email');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Profiles",
+      "description": "Analyze and manage GitHub profiles.",
+      "item": [
+        {
+          "name": "Analyze Profile",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/analyze/{{githubUsername}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Profile analyzed', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data?.githubUsername) {",
+                  "    pm.environment.set('lastAnalyzedUsername', json.data.githubUsername);",
+                  "    console.log('✅ Analyzed: ' + json.data.githubUsername);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Analyze Profile (gaearon)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/analyze/{{githubUsername2}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Profile analyzed', () => pm.response.to.have.status(201));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List All Profiles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has pagination', () => {",
+                  "    pm.expect(pm.response.json().data).to.have.property('pagination');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Single Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/{{githubUsername}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Analysis Requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/requests?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "requests"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "description": "Filter and sort analyzed profiles.",
+      "item": [
+        {
+          "name": "Search by Language & Stars",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/search?languages=JavaScript,TypeScript&minStars={{searchMinStars}}&sortBy=totalStars&sortOrder=desc&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "search"],
+              "query": [
+                { "key": "languages", "value": "JavaScript,TypeScript" },
+                { "key": "minStars", "value": "{{searchMinStars}}" },
+                { "key": "sortBy", "value": "totalStars" },
+                { "key": "sortOrder", "value": "desc" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search by Persona Score",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/search?persona={{persona}}&minPersonaScore={{searchMinPersonaScore}}&sortBy=personaScore&sortOrder=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "search"],
+              "query": [
+                { "key": "persona", "value": "{{persona}}" },
+                { "key": "minPersonaScore", "value": "{{searchMinPersonaScore}}" },
+                { "key": "sortBy", "value": "personaScore" },
+                { "key": "sortOrder", "value": "desc" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search by Keyword",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/search?q=developer&hasBio=true&sortBy=lastAnalyzedAt&sortOrder=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "search"],
+              "query": [
+                { "key": "q", "value": "developer" },
+                { "key": "hasBio", "value": "true" },
+                { "key": "sortBy", "value": "lastAnalyzedAt" },
+                { "key": "sortOrder", "value": "desc" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contribution Heatmap",
+      "description": "Live GitHub contribution data by time period.",
+      "item": [
+        {
+          "name": "Heatmap - Current Week",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/{{githubUsername}}/heatmap?period=currWeek",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "{{githubUsername}}", "heatmap"],
+              "query": [{ "key": "period", "value": "currWeek" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Heatmap retrieved', () => pm.response.to.have.status(200));",
+                  "pm.test('Has contribution days', () => {",
+                  "    pm.expect(pm.response.json().data.days).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Heatmap - Current Month",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/{{githubUsername}}/heatmap?period=currMonth",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "{{githubUsername}}", "heatmap"],
+              "query": [{ "key": "period", "value": "currMonth" }]
+            }
+          }
+        },
+        {
+          "name": "Heatmap - Current Year",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/{{githubUsername}}/heatmap?period=currYear",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "{{githubUsername}}", "heatmap"],
+              "query": [{ "key": "period", "value": "currYear" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Persona Ranking",
+      "description": "Score profiles against 6 engineering personas.",
+      "item": [
+        {
+          "name": "List Personas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/personas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Personas listed', () => pm.response.to.have.status(200));",
+                  "pm.test('Has 6 personas', () => {",
+                  "    pm.expect(pm.response.json().data.length).to.eql(6);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rank Profile",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/rank/{{githubUsername}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Profile ranked', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data?.bestMatch) {",
+                  "    pm.environment.set('lastBestPersona', json.data.bestMatch.persona);",
+                  "    pm.environment.set('lastBestScore', String(json.data.bestMatch.overallScore));",
+                  "    console.log('✅ Best match: ' + json.data.bestMatch.personaName + ' (' + json.data.bestMatch.overallScore + ')');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rank Profile (gaearon)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/rank/{{githubUsername2}}"
+          }
+        },
+        {
+          "name": "Get Profile Rankings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/{{githubUsername}}/rankings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Rankings retrieved', () => pm.response.to.have.status(200));",
+                  "pm.test('Has breakdown', () => {",
+                  "    const rankings = pm.response.json().data.rankings;",
+                  "    pm.expect(rankings[0].breakdown).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leaderboard - Frontend Developer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/rankings/leaderboard?persona={{persona}}&minScore={{leaderboardMinScore}}&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "rankings", "leaderboard"],
+              "query": [
+                { "key": "persona", "value": "{{persona}}" },
+                { "key": "minScore", "value": "{{leaderboardMinScore}}" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Leaderboard - Backend Developer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/rankings/leaderboard?persona={{personaBackend}}&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "rankings", "leaderboard"],
+              "query": [
+                { "key": "persona", "value": "{{personaBackend}}" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Demo Flow",
+      "description": "Run this folder in order (Collection Runner) for a full screening demo.\n\n1. Login\n2. Analyze candidates\n3. Rank candidates\n4. View leaderboard\n5. Search by persona",
+      "item": [
+        {
+          "name": "1. Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data?.tokens) {",
+                  "    pm.environment.set('accessToken', json.data.tokens.accessToken);",
+                  "    pm.environment.set('refreshToken', json.data.tokens.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Analyze octocat",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/analyze/octocat"
+          }
+        },
+        {
+          "name": "3. Analyze gaearon",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/analyze/gaearon"
+          }
+        },
+        {
+          "name": "4. Rank octocat",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/rank/octocat"
+          }
+        },
+        {
+          "name": "5. Rank gaearon",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/rank/gaearon"
+          }
+        },
+        {
+          "name": "6. Leaderboard - Full Stack",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/rankings/leaderboard?persona=fullstack_developer&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "rankings", "leaderboard"],
+              "query": [
+                { "key": "persona", "value": "fullstack_developer" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "7. Search Top Frontend Candidates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/search?persona=frontend_developer&minPersonaScore=30&sortBy=personaScore&sortOrder=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "search"],
+              "query": [
+                { "key": "persona", "value": "frontend_developer" },
+                { "key": "minPersonaScore", "value": "30" },
+                { "key": "sortBy", "value": "personaScore" },
+                { "key": "sortOrder", "value": "desc" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "8. Heatmap - octocat (currYear)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profiles/octocat/heatmap?period=currYear",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profiles", "octocat", "heatmap"],
+              "query": [{ "key": "period", "value": "currYear" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

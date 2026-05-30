@@ -14,7 +14,9 @@ interface ServerConfig {
 
     GOOGLE_CLIENT_ID: string;
     GOOGLE_CLIENT_SECRET: string;
-    GOOGLE_CALLBACK_URL: string
+    GOOGLE_CALLBACK_URL: string;
+
+    GITHUB_TOKEN: string;
 }
 
 const serverConfig: ServerConfig = {
@@ -30,7 +32,9 @@ const serverConfig: ServerConfig = {
 
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
-    GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL || ''
+    GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL || '',
+
+    GITHUB_TOKEN: process.env.GITHUB_TOKEN || '',
 };
 
 export default serverConfig;
