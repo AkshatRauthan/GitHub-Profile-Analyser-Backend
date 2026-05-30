@@ -15,7 +15,8 @@ Official docs: [Docker Spaces](https://huggingface.co/docs/hub/spaces-sdks-docke
 | Bind address | **`0.0.0.0`** (not `127.0.0.1`) — set via `HOST=0.0.0.0` in Dockerfile |
 | Root response | `GET /` → HTTP 200 |
 | Health probe | `GET /health` → HTTP 200 (always, even if DB is down) |
-| Container user | Runs as UID **1000** (HF recommendation) |
+| Container user | Runs as **`node`** (uid 1000, built into official `node:22-alpine` image) |
+| Build-time `DATABASE_URL` | Dummy value in Dockerfile — real URL from Space secrets at runtime |
 | Build-time GPU | Not used — no GPU calls during `docker build` |
 
 If the app binds to `127.0.0.1` or the wrong port, the Space stays stuck on **Starting** even when logs look fine.
@@ -148,7 +149,8 @@ Do **not** commit `.env` to the Space repo.
 | Symptom | Fix |
 |---------|-----|
 | Space stuck on **Starting** | Confirm `app_port: 7860`, `EXPOSE 7860`, app listens on `0.0.0.0:7860` |
-| Build fails on Prisma | Ensure `openssl` in runtime image (included in Dockerfile) |
+| Build fails on Prisma | Ensure `openssl` in runtime image; `prisma.config.ts` copied in Dockerfile; dummy `DATABASE_URL` at build |
+| `addgroup: gid 1000 in use` | Use built-in `node` user — do not create a second uid-1000 user |
 | `/health` 200 but API 500 | Check `DATABASE_URL` and DB IP allowlist |
 | Keep-alive fails | Set `HF_BACKEND_URL`; Space must be **public** or add HF auth to curl |
 | OAuth broken | Update `GOOGLE_CALLBACK_URL` and Google console to HF URL |
