@@ -149,7 +149,7 @@ Do **not** commit `.env` to the Space repo.
 | Symptom | Fix |
 |---------|-----|
 | Space stuck on **Starting** | Confirm `app_port: 7860`, `EXPOSE 7860`, app listens on `0.0.0.0:7860` |
-| Build fails on Prisma | Ensure `openssl` in runtime image; `prisma.config.ts` copied in Dockerfile; dummy `DATABASE_URL` at build |
+| `libquery_engine-linux-musl` not found | Alpine needs `binaryTargets = ["linux-musl-openssl-3.0.x"]` and engine `.node` files copied to `dist/generated/prisma` in Dockerfile |
 | `addgroup: gid 1000 in use` | Use built-in `node` user — do not create a second uid-1000 user |
 | `/health` 200 but API 500 | Check `DATABASE_URL` and DB IP allowlist |
 | Keep-alive fails | Set `HF_BACKEND_URL`; Space must be **public** or add HF auth to curl |
