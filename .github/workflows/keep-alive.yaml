@@ -1,0 +1,24 @@
+name: Keep Hugging Face Spaces Awake
+on:
+  schedule:
+    # Run every hour to prevent the 48-hour free-tier sleep timeout
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Node Backend Space
+        env:
+          HF_BACKEND_URL: ${{ secrets.HF_BACKEND_URL }}
+        run: |
+          if [ -z "$HF_BACKEND_URL" ]; then
+            echo "HF_BACKEND_URL secret is not set"
+            exit 1
+          fi
+          URL="${HF_BACKEND_URL%/}/health"
+          echo "Pinging $URL"
+          curl -sSf --max-time 30 "$URL"
+          echo ""
+          echo "Health check passed"

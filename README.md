@@ -1,3 +1,14 @@
+---
+title: GitHub Profile Analyser API
+emoji: 🔍
+colorFrom: purple
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+---
+
 # GitHub Profile Analyser — Backend API
 
 A Node.js backend that helps recruiters and hiring teams **analyze, compare, and rank GitHub developers** using real public data — instead of manually opening profiles one by one.
@@ -244,6 +255,22 @@ npm run dev
 
 More detail: [docs/setup-and-installation.md](docs/setup-and-installation.md)
 
+### Hugging Face Spaces (Docker)
+
+This backend is configured as a **Docker Space** (`sdk: docker`, `app_port: 7860`).
+
+```bash
+docker build -t gpa-backend .
+docker run --rm -p 7860:7860 -e DATABASE_URL=... -e JWT_SECRET=... gpa-backend
+curl http://localhost:7860/health
+```
+
+- Listens on **`0.0.0.0:7860`** (required by HF)
+- **`GET /`** and **`GET /health`** for deployment & keep-alive probes
+- Set Space secrets for `DATABASE_URL`, `JWT_SECRET`, etc.
+
+Full guide: [docs/deployment-huggingface.md](docs/deployment-huggingface.md)
+
 ---
 
 ## Postman
@@ -293,6 +320,7 @@ Guide: [postman/README.md](postman/README.md)
 | [Database schema](docs/database-schema.md) | Tables & migrations |
 | [API reference](docs/api-reference.md) | Endpoint cheat sheet |
 | [Changelog](docs/changelog.md) | Recent changes (backend + frontend summary) |
+| [Hugging Face deployment](docs/deployment-huggingface.md) | Docker Space, health probes, CI keep-alive |
 
 Index: [docs/README.md](docs/README.md) · Frontend: [../frontend/docs/README.md](../frontend/docs/README.md)
 
@@ -305,7 +333,8 @@ Index: [docs/README.md](docs/README.md) · Frontend: [../frontend/docs/README.md
 | `DATABASE_URL` | Yes | MySQL connection string (TiDB: add `sslaccept=strict&connect_timeout=60&pool_timeout=60`) |
 | `JWT_SECRET` | Yes | JWT signing secret |
 | `GITHUB_TOKEN` | Strongly recommended | GitHub PAT — use `repo` scope for private repos/contributions |
-| `PORT` | No | Default `3000` |
+| `PORT` | No | Default `3000` locally; **7860** on Hugging Face Docker Spaces |
+| `HOST` | No | Default `0.0.0.0` in Docker (required for HF health checks) |
 | `CORS_ORIGINS` | No | Frontend URLs (comma-separated) |
 | `FRONTEND_URL` | No | Frontend base URL for OAuth redirects |
 | `ACCESS_TOKEN_EXPIRY` | No | Seconds (numeric, unquoted). Default `3600` |

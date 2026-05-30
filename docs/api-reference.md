@@ -32,7 +32,27 @@ All API routes are prefixed with `/api/v1`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/health` | No | Server health check |
+| GET | `/` | No | Liveness probe (HF Docker Spaces — must not 404) |
+| GET | `/health` | No | Health check with DB status (`healthy` / `degraded`) |
+
+### `GET /health` response
+
+```json
+{
+  "status": "healthy",
+  "service": "github-profile-analyser-api",
+  "timestamp": "2026-05-30T12:00:00.000Z",
+  "uptimeSeconds": 120,
+  "startedAt": "2026-05-30T11:58:00.000Z",
+  "checks": {
+    "database": "connected"
+  }
+}
+```
+
+Always returns HTTP **200** when the server is up (so HF and keep-alive cron succeed). `status` is `degraded` when the database is unreachable.
+
+See [Hugging Face Deployment](deployment-huggingface.md).
 
 ---
 

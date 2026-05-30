@@ -107,7 +107,10 @@ Expected response:
 ```json
 {
   "status": "healthy",
-  "timestamp": "2026-05-30T12:00:00.000Z"
+  "service": "github-profile-analyser-api",
+  "timestamp": "2026-05-30T12:00:00.000Z",
+  "uptimeSeconds": 42,
+  "checks": { "database": "connected" }
 }
 ```
 

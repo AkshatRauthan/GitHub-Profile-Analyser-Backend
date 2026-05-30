@@ -5,6 +5,7 @@ Start with the [main README](../README.md) for problem statement, features, and 
 ## Getting started
 
 - [Setup & Installation](setup-and-installation.md)
+- [Hugging Face Deployment](deployment-huggingface.md)
 
 ## Core features
 

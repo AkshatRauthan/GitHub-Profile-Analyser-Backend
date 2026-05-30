@@ -1,6 +1,7 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
 
 import appRoutes from "@routes";
+import healthRoutes from "@routes/health.routes";
 import { corsConfig } from "@config";
 import { StatusCodes } from 'http-status-codes';
 import { errorHandler, CustomError } from '@errors';
@@ -12,9 +13,7 @@ app.use(corsConfig);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get('/health', (_req, res) => {
-    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
-});
+app.use(healthRoutes);
 
 app.use(appRoutes);
 

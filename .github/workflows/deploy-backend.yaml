@@ -1,0 +1,29 @@
+name: Deploy Node Backend to Hugging Face
+on:
+  push:
+    branches: [akshat-prod]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Install Hugging Face CLI
+        run: pip install -U huggingface_hub
+
+      - name: Deploy to Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_BACKEND_SPACE: ${{ secrets.HF_BACKEND_SPACE }}
+        run: |
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_BACKEND_SPACE" ]; then
+            echo "HF_TOKEN and HF_BACKEND_SPACE secrets must be set"
+            exit 1
+          fi
+          hf upload "$HF_BACKEND_SPACE" . . --repo-type space --token "$HF_TOKEN"
