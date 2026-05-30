@@ -1,0 +1,1 @@
+export { default as authMiddlewares } from "@middlewares/auth.middlewares";

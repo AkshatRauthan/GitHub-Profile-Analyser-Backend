@@ -1,0 +1,1 @@
+export { default as authRepository } from "@repositories/auth.repository";
