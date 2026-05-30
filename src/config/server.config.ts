@@ -9,8 +9,8 @@ interface ServerConfig {
     JWT_SECRET: string;
     COOKIE_SECRET: string;
 
-    ACCESS_TOKEN_EXPIRY: string;
-    REFRESH_TOKEN_EXPIRY: string;
+    ACCESS_TOKEN_EXPIRY: number;
+    REFRESH_TOKEN_EXPIRY: number;
 
     GOOGLE_CLIENT_ID: string;
     GOOGLE_CLIENT_SECRET: string;
@@ -27,8 +27,8 @@ const serverConfig: ServerConfig = {
     JWT_SECRET: process.env.JWT_SECRET || 'your-secret-key',
     COOKIE_SECRET: process.env.COOKIE_SECRET || 'your-cookie-secret',
 
-    ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY || '3600',
-    REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY || '86400',
+    ACCESS_TOKEN_EXPIRY: parseInt(process.env.ACCESS_TOKEN_EXPIRY ?? '3600', 10),
+    REFRESH_TOKEN_EXPIRY: parseInt(process.env.REFRESH_TOKEN_EXPIRY ?? '86400', 10),
 
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',

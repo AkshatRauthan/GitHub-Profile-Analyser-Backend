@@ -1,5 +1,5 @@
 import cors, { CorsOptions } from 'cors';
-import { serverConfig } from "@config";
+import serverConfig from './server.config';
 
 const allowedOrigins: string[] = [
     ...(serverConfig.CORS_ORIGINS

@@ -17,6 +17,8 @@ export interface IContributionHeatmap {
     to: string;
     totalContributions: number;
     days: IContributionDay[];
+    includesPrivateContributions?: boolean;
+    privateContributions?: number;
 }
 
 export interface IGitHubProfile {
@@ -99,6 +101,7 @@ export interface IGitHubContributionGraphQLResponse {
     data: {
         user: {
             contributionsCollection: {
+                restrictedContributionsCount: number;
                 contributionCalendar: {
                     totalContributions: number;
                     weeks: {
@@ -199,4 +202,21 @@ export interface IPaginatedResult<T> {
         total: number;
         totalPages: number;
     };
+}
+
+export interface ICompositionSlice {
+    label: string;
+    count: number;
+    percentage: number;
+}
+
+export interface IRepoComposition {
+    githubUsername: string;
+    totalRepos: number;
+    languages: ICompositionSlice[];
+    technologies: ICompositionSlice[];
+    frameworks: ICompositionSlice[];
+    repoTypes: ICompositionSlice[];
+    includesPrivateRepos?: boolean;
+    privateRepoCount?: number;
 }

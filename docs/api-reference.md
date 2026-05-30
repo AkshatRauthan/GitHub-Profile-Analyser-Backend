@@ -77,7 +77,21 @@ See [Profile Analysis](profile-analysis.md) and [Profile Search](profile-search.
 
 Periods: `currWeek`, `currMonth`, `currYear`
 
+Response may include `includesPrivateContributions` and `privateContributions` when `GITHUB_TOKEN` has access.
+
 See [Contribution Heatmap](contribution-heatmap.md).
+
+---
+
+## Repository Composition
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/profiles/:username/composition` | Yes | Live repo breakdown (languages, tech, frameworks, types) |
+
+Response may include `includesPrivateRepos` and `privateRepoCount` when `GITHUB_TOKEN` has access.
+
+See [Repository Composition](repo-composition.md).
 
 ---
 
@@ -139,3 +153,9 @@ GET /api/v1/profiles/search
 ```
 
 Full filter list: [Profile Search](profile-search.md)
+
+---
+
+## GitHub token & private data
+
+Set `GITHUB_TOKEN` in `.env` with `repo` scope to include private repos and contributions when the token has access. See [Private GitHub Data](private-github-data.md).

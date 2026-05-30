@@ -2,11 +2,12 @@ import { CustomError } from '@errors';
 import { StatusCodes } from 'http-status-codes';
 import { githubService } from '@services';
 import { profileRepository } from '@repositories';
-import { profileSearchHelpers } from '@helpers';
+import { profileSearchHelpers, repoCompositionHelpers } from '@helpers';
 import {
     IGitHubProfile,
     IGitHubAnalysisRequest,
     IContributionHeatmap,
+    IRepoComposition,
     IPaginationQuery,
     IProfileSearchQuery,
     IProfileSearchResult,
@@ -104,6 +105,11 @@ async function getContributionHeatmap(
     return githubService.fetchContributionHeatmap(githubUsername, parsedPeriod);
 }
 
+async function getRepoComposition(githubUsername: string): Promise<IRepoComposition> {
+    const repos = await githubService.fetchDetailedRepos(githubUsername);
+    return repoCompositionHelpers.buildRepoComposition(githubUsername, repos);
+}
+
 export default {
     analyzeGitHubProfile,
     getUserProfiles,
@@ -111,4 +117,5 @@ export default {
     getUserProfile,
     getUserAnalysisRequests,
     getContributionHeatmap,
+    getRepoComposition,
 };

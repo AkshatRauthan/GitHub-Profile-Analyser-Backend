@@ -19,6 +19,7 @@ Authorization: Bearer <token>
 
 - User profile: name, bio, location, company, avatar, followers, following, public repo count
 - Repositories (up to 100): languages, star counts → used to compute `totalStars` and `topLanguages`
+- When `GITHUB_TOKEN` is set with sufficient scopes (`repo`), **private repositories** the token can access are included (typically the token owner's own repos, or repos where the token holder is a collaborator/org member)
 
 ### Stored insights
 
@@ -116,4 +117,6 @@ See [Persona Ranking](persona-ranking.md).
 
 - [Profile Search](profile-search.md) — filter analyzed profiles
 - [Contribution Heatmap](contribution-heatmap.md) — separate live contribution API
+- [Repository Composition](repo-composition.md) — live repo breakdown
+- [Private GitHub Data](private-github-data.md)
 - [API Reference](api-reference.md)

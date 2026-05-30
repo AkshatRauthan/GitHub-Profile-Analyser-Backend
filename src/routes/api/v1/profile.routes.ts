@@ -43,6 +43,11 @@ router.get(
 );
 
 router.get(
+    '/:username/composition',
+    profileController.getRepoComposition
+);
+
+router.get(
     '/:username/heatmap',
     profileController.getContributionHeatmap
 );

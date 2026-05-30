@@ -37,7 +37,7 @@ List all personas: **`GET /api/v1/profiles/personas`**
 
 ### Deep repo analysis performed
 
-- Fetches up to **100 repos** from GitHub
+- Fetches up to **100 repos** from GitHub (public only without token; **includes private repos** when `GITHUB_TOKEN` has access — see [Private GitHub Data](private-github-data.md))
 - For top **40 repos by stars**, fetches **README content** (existence + length)
 - Collects: topics, license, forks, issues, wiki, homepage, push dates
 - Filters out forks, archived, and disabled repos for scoring
@@ -48,13 +48,13 @@ Each persona applies different **weights** to these metrics:
 
 | Metric | What it measures |
 |--------|------------------|
-| **Language Alignment** | % of owned repos using persona-aligned languages (star-weighted) |
-| **Repository Quality** | Descriptions, licenses, topics, size, engagement signals |
-| **Documentation & README** | README coverage + average length, descriptions, wiki, homepage |
-| **Activity & Freshness** | Recent pushes (6mo/1yr), repo volume, analysis recency |
+| **Language Alignment** | % of owned repos using persona-aligned languages (**weighted by repo size + README length**) |
+| **Repository Quality** | Descriptions, licenses, topics, **graduated codebase size**, engagement (size-weighted avg) |
+| **Documentation & README** | README coverage + length weighted by codebase size |
+| **Activity & Freshness** | Recent pushes weighted by repo size (6mo/1yr), repo volume |
 | **Community Impact** | Followers, total stars, forks (log-normalized) |
-| **Project Depth** | Standout projects (10+ stars), peak project impact |
-| **Tech Stack Match** | GitHub topics + repo names/descriptions vs persona keywords |
+| **Project Depth** | **Total/largest codebase (MB)**, substantial repos (≥5MB), star signals |
+| **Tech Stack Match** | Persona topics matched per repo, **weighted by codebase size** |
 | **Profile Completeness** | Bio, company, blog, location + persona keyword match in bio |
 
 ### Grades
@@ -175,3 +175,5 @@ See [Database Schema](database-schema.md).
 
 - [Profile Analysis](profile-analysis.md)
 - [Profile Search](profile-search.md)
+- [Repository Composition](repo-composition.md)
+- [Private GitHub Data](private-github-data.md)

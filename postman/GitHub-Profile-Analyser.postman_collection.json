@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "gpa-collection-v1",
     "name": "GitHub Profile Analyser API",
-    "description": "Complete API collection for GitHub Profile Analyser.\n\n## Setup\n1. Import the environment file\n2. Select **GitHub Profile Analyser - Local** environment\n3. Run **Auth → Register** or **Auth → Login** (tokens auto-saved)\n4. Run **Demo Flow → Full Screening Workflow** for end-to-end demo\n\n## Docs\nSee `/docs` folder in the repository for full feature documentation.",
+    "description": "Complete API collection for GitHub Profile Analyser.\n\n## Setup\n1. Import the environment file\n2. Select **GitHub Profile Analyser - Local** environment\n3. Run **Auth → Register** or **Auth → Login** (tokens auto-saved)\n4. Run **Demo Flow → Full Screening Workflow** for end-to-end demo\n\n## Private GitHub data\nSet `GITHUB_TOKEN` in backend `.env` with `repo` scope. Set `githubUsername` to your GitHub login (token owner) to test private repos and contributions.\n\n## Docs\nSee `backend/docs/` — api-reference.md, repo-composition.md, private-github-data.md, changelog.md",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -405,7 +405,11 @@
                   "pm.test('Heatmap retrieved', () => pm.response.to.have.status(200));",
                   "pm.test('Has contribution days', () => {",
                   "    pm.expect(pm.response.json().data.days).to.be.an('array');",
-                  "});"
+                  "});",
+                  "const heatmap = pm.response.json().data;",
+                  "if (heatmap.includesPrivateContributions) {",
+                  "    console.log('✅ Private contributions: ' + heatmap.privateContributions);",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -436,6 +440,51 @@
               "path": ["api", "v1", "profiles", "{{githubUsername}}", "heatmap"],
               "query": [{ "key": "period", "value": "currYear" }]
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Repository Composition",
+      "description": "Live repo breakdown by language, technology topics, frameworks, and repo type. Includes private repos when GITHUB_TOKEN has access.",
+      "item": [
+        {
+          "name": "Get Repo Composition",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/{{githubUsername}}/composition"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Composition retrieved', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Has language slices', () => {",
+                  "    pm.expect(data.languages).to.be.an('array');",
+                  "});",
+                  "pm.test('Has all dimensions', () => {",
+                  "    pm.expect(data.technologies).to.be.an('array');",
+                  "    pm.expect(data.frameworks).to.be.an('array');",
+                  "    pm.expect(data.repoTypes).to.be.an('array');",
+                  "});",
+                  "if (data.includesPrivateRepos) {",
+                  "    console.log('✅ Private repos in composition: ' + data.privateRepoCount);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Repo Composition (gaearon)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/{{githubUsername2}}/composition"
           }
         }
       ]
@@ -669,6 +718,14 @@
               "path": ["api", "v1", "profiles", "octocat", "heatmap"],
               "query": [{ "key": "period", "value": "currYear" }]
             }
+          }
+        },
+        {
+          "name": "9. Composition - octocat",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profiles/octocat/composition"
           }
         }
       ]

@@ -120,13 +120,32 @@ Live GitHub contribution graph data — not stored in DB; always fresh from GitH
 | **Current year (`currYear`)** | From Jan 1 → today (default) |
 | **Per-day breakdown** | Array of `{ date, count }` for charting |
 | **Total contributions** | Sum for the selected period |
+| **Private contributions** | Included when `GITHUB_TOKEN` can view private activity (`includesPrivateContributions`, `privateContributions`) |
 | **No prior analyze required** | Works for any public GitHub username |
 
 📄 [Full docs → docs/contribution-heatmap.md](docs/contribution-heatmap.md)
 
 ---
 
-### 5. Persona-based ranking
+### 5. Repository composition
+
+Live breakdown of a user's repos by language, technology topics, frameworks, and repo type.
+
+| Sub-feature | What it does |
+|-------------|----------------|
+| **Composition API** | `GET /api/v1/profiles/:username/composition` |
+| **Languages** | Primary language per repo with percentages |
+| **Technologies** | Topic tags (docker, kubernetes, tensorflow, etc.) |
+| **Frameworks** | Topic tags (react, django, flutter, etc.) |
+| **Repo types** | Original, Fork, Archived, GitHub Pages |
+| **Private repos** | Included when token has access (`includesPrivateRepos`, `privateRepoCount`) |
+| **Live only** | Not stored in DB — fetched on each request |
+
+📄 [Full docs → docs/repo-composition.md](docs/repo-composition.md)
+
+---
+
+### 6. Persona-based ranking
 
 Score developers **out of 100** for specific job roles with explainable sub-metrics.
 
@@ -135,7 +154,7 @@ Score developers **out of 100** for specific job roles with explainable sub-metr
 | **6 personas** | Frontend, Backend, Full Stack, AI/ML, DevOps, Mobile Developer |
 | **List personas** | `GET /api/v1/profiles/personas` |
 | **Rank profile** | `POST /api/v1/profiles/rank/:username` — scores all 6 personas at once |
-| **Deep repo analysis** | Up to 100 repos; README fetch for top 40 by stars; topics, license, forks, activity |
+| **Deep repo analysis** | Up to 100 repos (public + private when token allows); README fetch for top 40 by stars |
 | **8 scoring metrics** | Language alignment, repo quality, documentation, activity, community impact, project depth, tech stack match, profile completeness |
 | **Weighted scores per persona** | Each persona uses different weights |
 | **Grade labels** | Excellent / Strong / Good / Moderate / Developing |
@@ -149,16 +168,26 @@ Score developers **out of 100** for specific job roles with explainable sub-metr
 
 ---
 
-### 6. Database & API reference
+### 7. Private GitHub data (optional)
+
+When `GITHUB_TOKEN` is set with **`repo`** scope, the API includes private repos and private contributions wherever the token has access (typically when analyzing the token owner's own profile).
+
+📄 [Full docs → docs/private-github-data.md](docs/private-github-data.md)
+
+---
+
+### 8. Database & API reference
 
 | Sub-feature | What it does |
 |-------------|----------------|
 | **MySQL schema** | `users`, `github_profiles`, `profile_rankings`, `github_analysis_requests` |
 | **Prisma migrations** | Versioned schema in `prisma/migrations/` |
+| **Prisma reconnect/retry** | Auto-retries transient DB errors (TiDB Cloud, remote MySQL) |
 | **Consistent API responses** | `{ success, message, data }` on success; structured errors |
 
 📄 [Database → docs/database-schema.md](docs/database-schema.md)  
-📄 [All endpoints → docs/api-reference.md](docs/api-reference.md)
+📄 [All endpoints → docs/api-reference.md](docs/api-reference.md)  
+📄 [Changelog → docs/changelog.md](docs/changelog.md)
 
 ---
 
@@ -178,7 +207,8 @@ Register / Login  →  Analyze profiles  →  Rank profiles (6 personas)
 2. `POST /api/v1/profiles/analyze/gaearon`
 3. `POST /api/v1/profiles/rank/gaearon`
 4. `GET /api/v1/profiles/rankings/leaderboard?persona=frontend_developer`
-5. `GET /api/v1/profiles/search?persona=frontend_developer&minPersonaScore=60&sortBy=personaScore`
+5. `GET /api/v1/profiles/octocat/composition`
+6. `GET /api/v1/profiles/search?persona=frontend_developer&minPersonaScore=60&sortBy=personaScore`
 
 ---
 
@@ -257,11 +287,14 @@ Guide: [postman/README.md](postman/README.md)
 | [Profile analysis](docs/profile-analysis.md) | Analyze & store profiles |
 | [Profile search](docs/profile-search.md) | All search filters |
 | [Contribution heatmap](docs/contribution-heatmap.md) | Heatmap API |
+| [Repository composition](docs/repo-composition.md) | Live repo breakdown API |
 | [Persona ranking](docs/persona-ranking.md) | Scoring system |
+| [Private GitHub data](docs/private-github-data.md) | PAT scopes, private repos & contributions |
 | [Database schema](docs/database-schema.md) | Tables & migrations |
 | [API reference](docs/api-reference.md) | Endpoint cheat sheet |
+| [Changelog](docs/changelog.md) | Recent changes (backend + frontend summary) |
 
-Index: [docs/README.md](docs/README.md)
+Index: [docs/README.md](docs/README.md) · Frontend: [../frontend/docs/README.md](../frontend/docs/README.md)
 
 ---
 
@@ -269,11 +302,15 @@ Index: [docs/README.md](docs/README.md)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | Yes | MySQL connection string |
+| `DATABASE_URL` | Yes | MySQL connection string (TiDB: add `sslaccept=strict&connect_timeout=60&pool_timeout=60`) |
 | `JWT_SECRET` | Yes | JWT signing secret |
-| `GITHUB_TOKEN` | Strongly recommended | GitHub PAT |
+| `GITHUB_TOKEN` | Strongly recommended | GitHub PAT — use `repo` scope for private repos/contributions |
 | `PORT` | No | Default `3000` |
-| `CORS_ORIGINS` | No | Frontend URLs |
+| `CORS_ORIGINS` | No | Frontend URLs (comma-separated) |
+| `FRONTEND_URL` | No | Frontend base URL for OAuth redirects |
+| `ACCESS_TOKEN_EXPIRY` | No | Seconds (numeric, unquoted). Default `3600` |
+| `REFRESH_TOKEN_EXPIRY` | No | Seconds (numeric, unquoted). Default `86400` |
+| `COOKIE_SECRET` | No | Cookie signing secret |
 | `GOOGLE_CLIENT_*` | No | Google OAuth |
 
 ---

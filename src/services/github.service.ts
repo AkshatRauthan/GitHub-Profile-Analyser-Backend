@@ -34,6 +34,7 @@ interface IGitHubRepoApiResponse {
     fork: boolean;
     archived: boolean;
     disabled: boolean;
+    private?: boolean;
     has_wiki: boolean;
     has_pages: boolean;
     homepage: string | null;
@@ -45,10 +46,45 @@ interface IGitHubRepoApiResponse {
     default_branch: string;
 }
 
+interface IGitHubRepoGraphQLNode {
+    name: string;
+    nameWithOwner: string;
+    description: string | null;
+    primaryLanguage: { name: string } | null;
+    stargazerCount: number;
+    forkCount: number;
+    issues: { totalCount: number };
+    diskUsage: number | null;
+    isFork: boolean;
+    isArchived: boolean;
+    isDisabled: boolean;
+    isPrivate: boolean;
+    hasWikiEnabled: boolean;
+    homepageUrl: string | null;
+    repositoryTopics: { nodes: { topic: { name: string } }[] };
+    licenseInfo: { spdxId: string | null; name: string } | null;
+    updatedAt: string;
+    pushedAt: string | null;
+    createdAt: string;
+    defaultBranchRef: { name: string } | null;
+}
+
+interface IGitHubReposGraphQLResponse {
+    data: {
+        user: {
+            repositories: {
+                nodes: IGitHubRepoGraphQLNode[];
+            };
+        } | null;
+    };
+    errors?: { message: string }[];
+}
+
 const CONTRIBUTION_HEATMAP_QUERY = `
     query($username: String!, $from: DateTime!, $to: DateTime!) {
         user(login: $username) {
             contributionsCollection(from: $from, to: $to) {
+                restrictedContributionsCount
                 contributionCalendar {
                     totalContributions
                     weeks {
@@ -57,6 +93,41 @@ const CONTRIBUTION_HEATMAP_QUERY = `
                             contributionCount
                         }
                     }
+                }
+            }
+        }
+    }
+`;
+
+const ACCESSIBLE_REPOS_QUERY = `
+    query($username: String!, $first: Int!) {
+        user(login: $username) {
+            repositories(
+                first: $first
+                orderBy: { field: PUSHED_AT, direction: DESC }
+                ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR]
+            ) {
+                nodes {
+                    name
+                    nameWithOwner
+                    description
+                    primaryLanguage { name }
+                    stargazerCount
+                    forkCount
+                    issues { totalCount }
+                    diskUsage
+                    isFork
+                    isArchived
+                    isDisabled
+                    isPrivate
+                    hasWikiEnabled
+                    homepageUrl
+                    repositoryTopics(first: 20) { nodes { topic { name } } }
+                    licenseInfo { spdxId name }
+                    updatedAt
+                    pushedAt
+                    createdAt
+                    defaultBranchRef { name }
                 }
             }
         }
@@ -73,6 +144,100 @@ function getHeaders() {
     }
 
     return headers;
+}
+
+function mapGraphQLRepoToApi(node: IGitHubRepoGraphQLNode): IGitHubRepoApiResponse {
+    return {
+        name: node.name,
+        full_name: node.nameWithOwner,
+        description: node.description,
+        language: node.primaryLanguage?.name ?? null,
+        stargazers_count: node.stargazerCount,
+        forks_count: node.forkCount,
+        open_issues_count: node.issues.totalCount,
+        watchers_count: node.stargazerCount,
+        size: node.diskUsage ?? 0,
+        fork: node.isFork,
+        archived: node.isArchived,
+        disabled: node.isDisabled,
+        private: node.isPrivate,
+        has_wiki: node.hasWikiEnabled,
+        has_pages: Boolean(node.homepageUrl),
+        homepage: node.homepageUrl,
+        topics: node.repositoryTopics.nodes.map(({ topic }) => topic.name),
+        license: node.licenseInfo
+            ? { spdx_id: node.licenseInfo.spdxId, name: node.licenseInfo.name }
+            : null,
+        updated_at: node.updatedAt,
+        pushed_at: node.pushedAt ?? node.updatedAt,
+        created_at: node.createdAt,
+        default_branch: node.defaultBranchRef?.name ?? 'main',
+    };
+}
+
+async function fetchPublicReposRest(username: string): Promise<IGitHubRepoApiResponse[]> {
+    const { data } = await axios.get<IGitHubRepoApiResponse[]>(
+        `${GITHUB_API_BASE}/users/${username}/repos`,
+        {
+            headers: getHeaders(),
+            params: {
+                per_page: MAX_REPOS_TO_ANALYZE,
+                sort: 'updated',
+                type: 'owner',
+            },
+        }
+    );
+
+    return data.filter((repo) => !repo.disabled);
+}
+
+async function fetchAccessibleReposGraphQL(username: string): Promise<IGitHubRepoApiResponse[]> {
+    const { data } = await axios.post<IGitHubReposGraphQLResponse>(
+        GITHUB_GRAPHQL_URL,
+        {
+            query: ACCESSIBLE_REPOS_QUERY,
+            variables: { username, first: MAX_REPOS_TO_ANALYZE },
+        },
+        { headers: getHeaders() }
+    );
+
+    if (data.errors?.length) {
+        throw new CustomError(data.errors[0].message, StatusCodes.BAD_GATEWAY);
+    }
+
+    const nodes = data.data.user?.repositories.nodes;
+
+    if (!nodes) {
+        throw new CustomError(`GitHub user "${username}" not found`, StatusCodes.NOT_FOUND);
+    }
+
+    return nodes
+        .filter((node) => !node.isDisabled)
+        .map(mapGraphQLRepoToApi);
+}
+
+async function fetchAccessibleRepos(username: string): Promise<IGitHubRepoApiResponse[]> {
+    if (!serverConfig.GITHUB_TOKEN) {
+        try {
+            return await fetchPublicReposRest(username);
+        } catch (error) {
+            handleGitHubError(error, username);
+        }
+    }
+
+    try {
+        return await fetchAccessibleReposGraphQL(username);
+    } catch (error) {
+        if (error instanceof CustomError) {
+            throw error;
+        }
+
+        try {
+            return await fetchPublicReposRest(username);
+        } catch (fallbackError) {
+            handleGitHubError(fallbackError, username);
+        }
+    }
 }
 
 function buildTopLanguages(repos: IGitHubRepoResponse[]): ILanguageStat[] {
@@ -177,6 +342,7 @@ function mapRepoToDetail(
         default_branch: repo.default_branch,
         hasReadme: readmeMeta.hasReadme,
         readmeLength: readmeMeta.readmeLength,
+        isPrivate: repo.private ?? false,
     };
 }
 
@@ -236,14 +402,11 @@ async function fetchUser(username: string): Promise<IGitHubUserResponse> {
 
 async function fetchUserRepos(username: string): Promise<IGitHubRepoResponse[]> {
     try {
-        const { data } = await axios.get<IGitHubRepoResponse[]>(
-            `${GITHUB_API_BASE}/users/${username}/repos`,
-            {
-                headers: getHeaders(),
-                params: { per_page: 100, sort: 'updated', type: 'owner' },
-            }
-        );
-        return data;
+        const repos = await fetchAccessibleRepos(username);
+        return repos.map((repo) => ({
+            language: repo.language,
+            stargazers_count: repo.stargazers_count,
+        }));
     } catch (error) {
         handleGitHubError(error, username);
     }
@@ -253,18 +416,7 @@ async function fetchDetailedRepos(username: string): Promise<IGitHubRepoDetail[]
     let repos: IGitHubRepoApiResponse[];
 
     try {
-        const { data } = await axios.get<IGitHubRepoApiResponse[]>(
-            `${GITHUB_API_BASE}/users/${username}/repos`,
-            {
-                headers: getHeaders(),
-                params: {
-                    per_page: MAX_REPOS_TO_ANALYZE,
-                    sort: 'updated',
-                    type: 'owner',
-                },
-            }
-        );
-        repos = data.filter((repo) => !repo.disabled);
+        repos = await fetchAccessibleRepos(username);
     } catch (error) {
         handleGitHubError(error, username);
     }
@@ -319,11 +471,14 @@ async function fetchContributionHeatmap(
             );
         }
 
-        const calendar = data.data.user?.contributionsCollection.contributionCalendar;
+        const collection = data.data.user?.contributionsCollection;
 
-        if (!calendar) {
+        if (!collection) {
             throw new CustomError(`GitHub user "${username}" not found`, StatusCodes.NOT_FOUND);
         }
+
+        const calendar = collection.contributionCalendar;
+        const privateContributions = collection.restrictedContributionsCount ?? 0;
 
         const days = calendar.weeks.flatMap((week) =>
             week.contributionDays.map((day) => ({
@@ -339,6 +494,8 @@ async function fetchContributionHeatmap(
             to,
             totalContributions: calendar.totalContributions,
             days,
+            includesPrivateContributions: privateContributions > 0,
+            privateContributions,
         };
     } catch (error) {
         if (error instanceof CustomError) throw error;

@@ -76,6 +76,16 @@ async function getContributionHeatmap(req: Request, res: Response, next: NextFun
     }
 }
 
+async function getRepoComposition(req: Request, res: Response, next: NextFunction) {
+    try {
+        const username = String(req.params.username);
+        const composition = await profileService.getRepoComposition(username);
+        new SuccessResponse('Repository composition retrieved successfully', composition).send(res);
+    } catch (error) {
+        next(error);
+    }
+}
+
 export default {
     analyzeProfile,
     getAllProfiles,
@@ -83,4 +93,5 @@ export default {
     getProfile,
     getAnalysisRequests,
     getContributionHeatmap,
+    getRepoComposition,
 };

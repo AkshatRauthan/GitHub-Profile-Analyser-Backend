@@ -40,6 +40,20 @@ GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
 
 Without `GITHUB_TOKEN`, GitHub API rate limits are **60 requests/hour** per IP. Ranking and analysis make multiple API calls per profile, so a token (5000 req/hr) is essential for real usage.
 
+For **private repos and private contributions**, use a PAT with the **`repo`** scope. See [Private GitHub Data](private-github-data.md).
+
+### Database URL (TiDB Cloud / remote MySQL)
+
+For cloud-hosted MySQL (e.g. TiDB Cloud), include SSL and timeout parameters:
+
+```env
+DATABASE_URL="mysql://USER:PASSWORD@HOST:4000/DATABASE?sslaccept=strict&connect_timeout=60&pool_timeout=60"
+```
+
+Ensure your IP is allowlisted in the cloud provider console and the cluster is not paused.
+
+The backend automatically **retries** transient DB connection errors (useful after long GitHub API calls or cold cluster wake-up).
+
 ### Optional variables
 
 ```env
@@ -51,7 +65,10 @@ REFRESH_TOKEN_EXPIRY=86400
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_CALLBACK_URL=
+COOKIE_SECRET=
 ```
+
+> **JWT expiry:** Use numeric seconds only (e.g. `3600`). Do not quote values — `jsonwebtoken` v9 treats `"3600"` as milliseconds.
 
 ## Database setup
 
@@ -113,7 +130,10 @@ The collection includes a **Demo Flow → Full Screening Workflow** folder that 
 
 | Issue | Solution |
 |-------|----------|
-| `Failed to connect to the database` | Check `DATABASE_URL`, ensure MySQL is running |
+| `Failed to connect to the database` | Check `DATABASE_URL`, ensure MySQL/TiDB is running and IP is allowlisted |
+| `Can't reach database server` (TiDB) | Cluster may be paused — wake it in TiDB console; retry (backend auto-retries 2×) |
 | GitHub rate limit errors | Add `GITHUB_TOKEN` to `.env` |
+| Private repos not appearing | Token needs `repo` scope; analyze the **token owner's** username |
+| JWT expires immediately after login | Ensure `ACCESS_TOKEN_EXPIRY` is unquoted numeric seconds |
 | `Profile not found. Analyze first` | Run `POST /profiles/analyze/:username` before ranking |
 | Prisma client errors | Run `npm run db:generate` after schema changes |

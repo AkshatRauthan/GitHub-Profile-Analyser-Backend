@@ -88,6 +88,7 @@ export interface IGitHubRepoDetail {
     default_branch: string;
     hasReadme: boolean;
     readmeLength: number;
+    isPrivate?: boolean;
 }
 
 export interface IRankingAnalysisContext {

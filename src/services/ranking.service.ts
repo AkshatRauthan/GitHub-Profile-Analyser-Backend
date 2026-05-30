@@ -45,6 +45,35 @@ function getOwnedRepos(repos: IGitHubRepoDetail[]): IGitHubRepoDetail[] {
     return repos.filter((repo) => !repo.fork && !repo.archived && !repo.disabled);
 }
 
+/**
+ * Dynamic influence weight from repo codebase size (GitHub KB) + README length.
+ * Larger repos contribute more to persona alignment and stack matching.
+ */
+function getRepoCodeWeight(repo: IGitHubRepoDetail): number {
+    const sizeKb = repo.size ?? 0;
+    const readmeChars = repo.readmeLength ?? 0;
+
+    const sizeFactor = normalizeLog(sizeKb + 1, 100_000) / 100;
+    const readmeFactor = normalizeLog(readmeChars + 1, 10_000) / 100;
+
+    return 1 + sizeFactor * 4 + readmeFactor * 1.5;
+}
+
+function weightedAverage(values: number[], repos: IGitHubRepoDetail[]): number {
+    if (!values.length) return 0;
+
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    values.forEach((value, index) => {
+        const weight = getRepoCodeWeight(repos[index]);
+        weightedSum += value * weight;
+        totalWeight += weight;
+    });
+
+    return totalWeight > 0 ? weightedSum / totalWeight : 0;
+}
+
 function getGrade(score: number): PersonaGrade {
     if (score >= 90) return 'Excellent';
     if (score >= 75) return 'Strong';
@@ -73,7 +102,7 @@ function scoreLanguageAlignment(
     let weightedMatch = 0;
 
     for (const repo of ownedRepos) {
-        const weight = 1 + repo.stargazers_count;
+        const weight = getRepoCodeWeight(repo);
         weightedTotal += weight;
 
         if (repo.language && personaLanguages.has(repo.language.toLowerCase())) {
@@ -85,9 +114,13 @@ function scoreLanguageAlignment(
         (repo) => repo.language && personaLanguages.has(repo.language.toLowerCase())
     ).length;
 
+    const totalSizeMb = round(
+        ownedRepos.reduce((sum, repo) => sum + repo.size, 0) / 1024
+    );
+
     return {
         score: round(clamp((weightedMatch / weightedTotal) * 100)),
-        summary: `${alignedCount}/${ownedRepos.length} original repos use ${persona.name} languages`,
+        summary: `${alignedCount}/${ownedRepos.length} original repos use ${persona.name} languages (weighted by ~${totalSizeMb}MB codebase)`,
     };
 }
 
@@ -104,21 +137,24 @@ function scoreRepositoryQuality(repos: IGitHubRepoDetail[]): { score: number; su
         else if (repo.description) score += 12;
         if (repo.license?.spdx_id && repo.license.spdx_id !== 'NOASSERTION') score += 20;
         if (repo.topics.length > 0) score += 15;
-        if (repo.size > 50) score += 15;
+        score += normalizeLog(repo.size, 50_000) * 0.20;
         if (repo.stargazers_count > 0) score += 10;
         if (repo.forks_count > 0) score += 10;
         if (repo.open_issues_count >= 0) score += 5;
         return score;
     });
 
-    const avgScore = repoScores.reduce((sum, value) => sum + value, 0) / repoScores.length;
+    const avgScore = weightedAverage(repoScores, ownedRepos);
     const licensedCount = ownedRepos.filter(
         (repo) => repo.license?.spdx_id && repo.license.spdx_id !== 'NOASSERTION'
     ).length;
+    const totalSizeMb = round(
+        ownedRepos.reduce((sum, repo) => sum + repo.size, 0) / 1024
+    );
 
     return {
         score: round(clamp(avgScore)),
-        summary: `${licensedCount}/${ownedRepos.length} repos have licenses; avg quality signals assessed`,
+        summary: `${licensedCount}/${ownedRepos.length} repos licensed; quality scored by size (~${totalSizeMb}MB total)`,
     };
 }
 
@@ -130,10 +166,23 @@ function scoreDocumentation(repos: IGitHubRepoDetail[]): { score: number; summar
     }
 
     const readmeRepos = ownedRepos.filter((repo) => repo.hasReadme);
-    const readmeCoverage = (readmeRepos.length / ownedRepos.length) * 55;
 
-    const avgReadmeLength = readmeRepos.length
-        ? readmeRepos.reduce((sum, repo) => sum + repo.readmeLength, 0) / readmeRepos.length
+    let readmeCoverageWeighted = 0;
+    let totalWeight = 0;
+    let readmeLengthWeighted = 0;
+
+    for (const repo of ownedRepos) {
+        const weight = getRepoCodeWeight(repo);
+        totalWeight += weight;
+        if (repo.hasReadme) {
+            readmeCoverageWeighted += weight;
+            readmeLengthWeighted += repo.readmeLength * weight;
+        }
+    }
+
+    const readmeCoverage = totalWeight > 0 ? (readmeCoverageWeighted / totalWeight) * 55 : 0;
+    const avgReadmeLength = readmeCoverageWeighted > 0
+        ? readmeLengthWeighted / readmeCoverageWeighted
         : 0;
 
     const readmeDepth = normalizeLinear(avgReadmeLength, 2500) * 0.25;
@@ -144,9 +193,11 @@ function scoreDocumentation(repos: IGitHubRepoDetail[]): { score: number; summar
     const wikiCoverage =
         (ownedRepos.filter((repo) => repo.has_wiki).length / ownedRepos.length) * 5;
 
+    const readmeCount = ownedRepos.filter((repo) => repo.hasReadme).length;
+
     return {
         score: round(clamp(readmeCoverage + readmeDepth + descriptionCoverage + homepageCoverage + wikiCoverage)),
-        summary: `${readmeRepos.length}/${ownedRepos.length} repos have README files (avg ${Math.round(avgReadmeLength)} chars)`,
+        summary: `${readmeCount}/${ownedRepos.length} repos have READMEs (avg ${Math.round(avgReadmeLength)} chars, size-weighted)`,
     };
 }
 
@@ -156,6 +207,23 @@ function scoreActivity(repos: IGitHubRepoDetail[], profile: IGitHubProfile): { s
     const sixMonthsMs = 1000 * 60 * 60 * 24 * 30 * 6;
     const oneYearMs = 1000 * 60 * 60 * 24 * 365;
 
+    const recentWeight = ownedRepos.reduce((sum, repo) => {
+        const isRecent = now - new Date(repo.pushed_at).getTime() <= sixMonthsMs;
+        return sum + (isRecent ? getRepoCodeWeight(repo) : 0);
+    }, 0);
+    const yearlyWeight = ownedRepos.reduce((sum, repo) => {
+        const isYearly = now - new Date(repo.pushed_at).getTime() <= oneYearMs;
+        return sum + (isYearly ? getRepoCodeWeight(repo) : 0);
+    }, 0);
+    const totalCodeWeight = ownedRepos.reduce((sum, repo) => sum + getRepoCodeWeight(repo), 0);
+
+    const recentRatio = totalCodeWeight > 0 ? (recentWeight / totalCodeWeight) * 45 : 0;
+    const yearlyRatio = totalCodeWeight > 0 ? (yearlyWeight / totalCodeWeight) * 25 : 0;
+    const repoVolume = normalizeLinear(profile.publicRepos, 30) * 0.20;
+    const lastAnalyzedFreshness = profile.lastAnalyzedAt
+        ? clamp(100 - ((now - new Date(profile.lastAnalyzedAt).getTime()) / (1000 * 60 * 60 * 24 * 30)) * 20)
+        : 50;
+
     const recentRepos = ownedRepos.filter(
         (repo) => now - new Date(repo.pushed_at).getTime() <= sixMonthsMs
     ).length;
@@ -163,16 +231,9 @@ function scoreActivity(repos: IGitHubRepoDetail[], profile: IGitHubProfile): { s
         (repo) => now - new Date(repo.pushed_at).getTime() <= oneYearMs
     ).length;
 
-    const recentRatio = ownedRepos.length ? (recentRepos / ownedRepos.length) * 45 : 0;
-    const yearlyRatio = ownedRepos.length ? (yearlyRepos / ownedRepos.length) * 25 : 0;
-    const repoVolume = normalizeLinear(profile.publicRepos, 30) * 0.20;
-    const lastAnalyzedFreshness = profile.lastAnalyzedAt
-        ? clamp(100 - ((now - new Date(profile.lastAnalyzedAt).getTime()) / (1000 * 60 * 60 * 24 * 30)) * 20)
-        : 50;
-
     return {
         score: round(clamp(recentRatio + yearlyRatio + repoVolume + lastAnalyzedFreshness * 0.10)),
-        summary: `${recentRepos} repos updated in last 6 months; ${yearlyRepos} in last year`,
+        summary: `${recentRepos} repos updated in 6mo (${Math.round(recentWeight)} code-weight); ${yearlyRepos} in last year`,
     };
 }
 
@@ -199,16 +260,22 @@ function scoreProjectDepth(repos: IGitHubRepoDetail[]): { score: number; summary
     }
 
     const maxStars = Math.max(...ownedRepos.map((repo) => repo.stargazers_count));
+    const totalSizeKb = ownedRepos.reduce((sum, repo) => sum + repo.size, 0);
+    const maxSizeKb = Math.max(...ownedRepos.map((repo) => repo.size));
+    const substantialRepos = ownedRepos.filter((repo) => repo.size >= 5_000).length;
     const notableProjects = ownedRepos.filter((repo) => repo.stargazers_count >= 10).length;
-    const avgStars = ownedRepos.reduce((sum, repo) => sum + repo.stargazers_count, 0) / ownedRepos.length;
 
-    const peakProject = normalizeLog(maxStars, 500) * 0.40;
-    const notableRatio = normalizeLinear(notableProjects, 5) * 0.35;
-    const averageImpact = normalizeLog(avgStars, 50) * 0.25;
+    const codebaseVolume = normalizeLog(totalSizeKb, 200_000) * 0.35;
+    const largestRepo = normalizeLog(maxSizeKb, 100_000) * 0.30;
+    const substantialRatio = normalizeLinear(substantialRepos, 5) * 0.20;
+    const starSignal = normalizeLog(maxStars, 500) * 0.15;
+
+    const totalSizeMb = round(totalSizeKb / 1024);
+    const largestMb = round(maxSizeKb / 1024);
 
     return {
-        score: round(clamp(peakProject + notableRatio + averageImpact)),
-        summary: `${notableProjects} repos with 10+ stars; top repo has ${maxStars} stars`,
+        score: round(clamp(codebaseVolume + largestRepo + substantialRatio + starSignal)),
+        summary: `${totalSizeMb}MB total codebase; largest repo ${largestMb}MB; ${substantialRepos} repos ≥5MB; ${notableProjects} with 10+ stars`,
     };
 }
 
@@ -223,10 +290,15 @@ function scoreTechStackMatch(
     }
 
     const personaTopics = persona.topics.map((topic) => topic.toLowerCase());
-    let matchedRepos = 0;
-    let totalMatches = 0;
+    let matchedWeight = 0;
+    let totalWeight = 0;
+    let matchDepth = 0;
+    let matchedRepoCount = 0;
 
     for (const repo of ownedRepos) {
+        const weight = getRepoCodeWeight(repo);
+        totalWeight += weight;
+
         const repoTopics = repo.topics.map((topic) => topic.toLowerCase());
         const repoMatches = personaTopics.filter((topic) =>
             repoTopics.includes(topic) ||
@@ -235,17 +307,20 @@ function scoreTechStackMatch(
         );
 
         if (repoMatches.length > 0) {
-            matchedRepos += 1;
-            totalMatches += repoMatches.length;
+            matchedRepoCount += 1;
+            matchedWeight += weight;
+            matchDepth += repoMatches.length * weight;
         }
     }
 
-    const coverageScore = (matchedRepos / ownedRepos.length) * 65;
-    const depthScore = normalizeLinear(totalMatches, ownedRepos.length * 2) * 35;
+    const coverageScore = totalWeight > 0 ? (matchedWeight / totalWeight) * 65 : 0;
+    const depthScore = totalWeight > 0
+        ? normalizeLinear(matchDepth / totalWeight, 3) * 35
+        : 0;
 
     return {
         score: round(clamp(coverageScore + depthScore)),
-        summary: `${matchedRepos}/${ownedRepos.length} repos match ${persona.name} tech topics`,
+        summary: `${matchedRepoCount}/${ownedRepos.length} repos match ${persona.name} stack (weighted by codebase size)`,
     };
 }
 

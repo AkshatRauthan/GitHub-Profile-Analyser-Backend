@@ -22,11 +22,11 @@ function generateTokens(user: IUser): IAuthTokens {
 
     const accessToken = jwt.sign(payload, serverConfig.JWT_SECRET, {
         expiresIn: serverConfig.ACCESS_TOKEN_EXPIRY,
-    } as jwt.SignOptions);
+    });
 
     const refreshToken = jwt.sign(payload, serverConfig.JWT_SECRET, {
         expiresIn: serverConfig.REFRESH_TOKEN_EXPIRY,
-    } as jwt.SignOptions);
+    });
 
     return { accessToken, refreshToken };
 }
